@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WebGIS</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Segoe UI,Tahoma,sans-serif;height:100vh;overflow:hidden}
+#map{width:100%;height:100vh}
+
+/* Painel */
+.control-panel{
+    position:absolute;top:10px;right:10px;
+    background:#fff;border-radius:8px;
+    box-shadow:0 2px 10px rgba(0,0,0,.3);
+    z-index:1000;padding:8px
+}
+.control-panel.minimized .panel-body{display:none}
+
+.panel-header{display:flex;justify-content:flex-end}
+.panel-toggle{
+    width:36px;height:36px;border:1px solid #ddd;
+    border-radius:8px;background:#fff;cursor:pointer
+}
+.panel-toggle svg{width:20px;height:20px;fill:#333}
+
+.panel-body{margin-top:10px;min-width:240px}
+
+/* Basemap thumbs */
+.basemap-grid{
+    display:grid;
+    grid-template-columns:repeat(2,1fr);
+    gap:8px;margin-bottom:10px
+}
+.basemap-item{
+    border:2px solid #ddd;
+    border-radius:6px;
+    overflow:hidden;
+    cursor:pointer;
+    text-align:center;
+    font-size:12px
+}
+.basemap-item.active{border-color:#4CAF50}
+.basemap-item img{
+    width:100%;height:70px;object-fit:cover;display:block
+}
+.basemap-item span{display:block;padding:4px}
+
+/* Toggles */
+.toggle{
+    display:flex;align-items:center;
+    gap:6px;margin:8px 0
+}
+
+/* Layers */
+.layer-toggle{
+    display:flex;align-items:center;
+    gap:6px;margin:6px 0;font-size:13px
+}
+
+/* Loading */
+.loading-indicator{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    background:rgba(255,255,255,.9);
+    padding:20px;border-radius:8px;
+    display:none;z-index:2000
+}
+.loading-indicator.active{display:block}
+
+/* Rótulos das UCs */
+.uc-label{
+    background:rgba(255,255,255,0.8);
+    border:none;
+    box-shadow:none;
+    font-size:11px;
+    font-weight:600;
+    color:#2e7d32;
+    text-align:center;
+}
+</style>
+</head>
+
+<body>
+
+<div id="map"></div>
+<div class="loading-indicator" id="loading">Carregando camadas…</div>
+
+<div class="control-panel minimized" id="control-panel">
+    <div class="panel-header">
+        <button class="panel-toggle" id="panel-toggle" title="Configurações">
+            <svg viewBox="0 0 24 24">
+                <path d="M19.14,12.94c0.04-0.31,0.06-0.63,0.06-0.94s-0.02-0.63-0.06-0.94l2.03-1.58
+                c0.18-0.14,0.23-0.41,0.12-0.61l-1.92-3.32c-0.11-0.2-0.36-0.28-0.57-0.2l-2.39,0.96
+                c-0.5-0.38-1.04-0.7-1.64-0.94L14.5,2.5c-0.02-0.22-0.21-0.39-0.44-0.39h-4.12
+                c-0.23,0-0.42,0.17-0.44,0.39L9.12,5.37c-0.6,0.24-1.14,0.56-1.64,0.94L5.09,5.35
+                c-0.21-0.08-0.46,0-0.57,0.2L2.6,8.87c-0.11,0.2-0.06,0.46,0.12,0.61l2.03,1.58
+                C4.71,11.37,4.69,11.69,4.69,12s0.02,0.63,0.06,0.94l-2.03,1.58
+                c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.11,0.2,0.36,0.28,0.57,0.2l2.39-0.96
+                c0.5,0.38,1.04,0.7,1.64,0.94l0.38,2.87c0.02,0.22,0.21,0.39,0.44,0.39h4.12
+                c0.23,0,0.42-0.17,0.44-0.39l0.38-2.87c0.6-0.24,1.14-0.56,1.64-0.94l2.39,0.96
+                c0.21,0.08,0.46,0,0.57-0.2l1.92-3.32c0.11-0.2,0.06-0.46-0.12-0.61L19.14,12.94z"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="panel-body">
+
+        <strong>Basemap</strong>
+        <div class="basemap-grid">
+            <div class="basemap-item active" data-map="satellite">
+                <img src="https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/5/10/10">
+                <span>Satélite</span>
+            </div>
+            <div class="basemap-item" data-map="roadmap">
+                <img src="https://tile.openstreetmap.org/5/10/10.png">
+                <span>Mapa Base</span>
+            </div>
+        </div>
+
+        <div class="toggle">
+            <input type="checkbox" id="toggle-labels">
+            <label for="toggle-labels">Mostrar rótulos (basemap)</label>
+        </div>
+
+        <strong>Camadas</strong>
+        <div class="layer-toggle">
+            <input type="checkbox" id="layer-anm" checked>
+            <label for="layer-anm">Base ANM x UCs</label>
+        </div>
+        <div class="layer-toggle">
+            <input type="checkbox" id="layer-ucs" checked>
+            <label for="layer-ucs">Limites UCs</label>
+        </div>
+
+    </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.gridlayer.googlemutant@0.13.0/dist/Leaflet.GoogleMutant.js"></script>
+
+<script>
+const GOOGLE_MAPS_API_KEY = 'SUA_CHAVE_API_AQUI';
+const useGoogle = GOOGLE_MAPS_API_KEY !== 'SUA_CHAVE_API_AQUI';
+
+const map = L.map('map').setView([-22.9,-43],10);
+
+/* Panes */
+map.createPane('basemapPane');
+map.getPane('basemapPane').style.zIndex=200;
+map.createPane('overlayPaneCustom');
+map.getPane('overlayPaneCustom').style.zIndex=400;
+
+let baseLayer=null, labelLayer=null;
+let anmLayer=null, ucsLayer=null;
+
+/* Loading */
+function showLoading(v){
+    document.getElementById('loading').classList.toggle('active',v);
+}
+
+/* Basemap */
+function setBasemap(type){
+    if(baseLayer) map.removeLayer(baseLayer);
+    if(labelLayer){ map.removeLayer(labelLayer); labelLayer=null; }
+
+    if(useGoogle){
+        baseLayer = L.gridLayer.googleMutant({
+            type: type==='satellite'?'satellite':'roadmap'
+        }).addTo(map);
+    }else{
+        baseLayer = type==='satellite'
+            ? L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}')
+            : L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png');
+        baseLayer.addTo(map);
+    }
+}
+
+function toggleLabels(on){
+    if(labelLayer){ map.removeLayer(labelLayer); labelLayer=null; }
+    if(!on) return;
+
+    if(useGoogle){
+        labelLayer = L.gridLayer.googleMutant({type:'hybrid'}).addTo(map);
+    }else{
+        labelLayer = L.tileLayer(
+            'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}'
+        ).addTo(map);
+    }
+}
+
+/* GeoJSON loader com rótulo */
+function loadGeoJSON(url, style, cb){
+    showLoading(true);
+    fetch(url)
+        .then(r=>{
+            if(!r.ok) throw new Error('HTTP '+r.status);
+            return r.json();
+        })
+        .then(data=>{
+            showLoading(false);
+            const layer = L.geoJSON(data,{
+                style:style,
+                pane:'overlayPaneCustom',
+                onEachFeature:(feature, layer)=>{
+                    /* Popup */
+                    if(feature.properties){
+                        let html='';
+                        for(let k in feature.properties){
+                            html+=`<b>${k}</b>: ${feature.properties[k]}<br>`;
+                        }
+                        layer.bindPopup(html);
+                    }
+
+                    /* 🔖 Rótulos das UCs */
+                    if(
+                        url.includes('lim_UCs') &&
+                        feature.properties &&
+                        feature.properties.nome_uc
+                    ){
+                        layer.bindTooltip(
+                            feature.properties.nome_uc,
+                            {
+                                permanent:true,
+                                direction:'center',
+                                className:'uc-label'
+                            }
+                        );
+                    }
+                }
+            }).addTo(map);
+            cb(layer);
+        })
+        .catch(e=>{
+            showLoading(false);
+            alert('Erro ao carregar '+url+'\n'+e.message);
+        });
+}
+
+/* Layer toggles */
+document.getElementById('layer-anm').onchange=e=>{
+    if(e.target.checked){
+        loadGeoJSON(
+            'data/base_ANM_pol_X_UCs.geojson',
+            {color:'#ff6b6b',weight:2,fillOpacity:.3},
+            l=>anmLayer=l
+        );
+    }else if(anmLayer){
+        map.removeLayer(anmLayer); anmLayer=null;
+    }
+};
+
+document.getElementById('layer-ucs').onchange=e=>{
+    if(e.target.checked){
+        loadGeoJSON(
+            'data/lim_UCs_pol.geojson',
+            {color:'#00ff00',weight:2,fillOpacity:0},
+            l=>ucsLayer=l
+        );
+    }else if(ucsLayer){
+        map.removeLayer(ucsLayer); ucsLayer=null;
+    }
+};
+
+/* UI */
+document.querySelectorAll('.basemap-item').forEach(el=>{
+    el.onclick=()=>{
+        document.querySelectorAll('.basemap-item').forEach(i=>i.classList.remove('active'));
+        el.classList.add('active');
+        setBasemap(el.dataset.map);
+    };
+});
+
+document.getElementById('toggle-labels').onchange=e=>{
+    toggleLabels(e.target.checked);
+};
+
+document.getElementById('panel-toggle').onclick=()=>{
+    document.getElementById('control-panel').classList.toggle('minimized');
+};
+
+/* Init */
+setBasemap('satellite');
+document.getElementById('layer-anm').dispatchEvent(new Event('change'));
+document.getElementById('layer-ucs').dispatchEvent(new Event('change'));
+</script>
+
+</body>
+</html>

@@ -1,0 +1,16 @@
+# Arquivos de configuração com chaves de API
+config.js
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
